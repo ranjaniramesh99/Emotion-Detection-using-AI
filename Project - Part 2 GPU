@@ -1,0 +1,210 @@
+import cv2
+import keras
+import numpy as np 
+import pandas as pd 
+import sklearn 
+import tensorflow as tf
+import pickle # Converts objects hierarchy to byte streams and vice versa
+import warnings # To hide Python warnings to the user 
+import math
+import gdown # Imports large files from Google drive
+import urllib.request # For accesing and importing URLs
+from scipy.spatial import distance # Computing distances between arrays
+from matplotlib import pyplot as plt 
+import dlib
+from sklearn.decomposition import PCA # Compress input using a scaling factor 
+from sklearn.preprocessing import StandardScaler # Standardises by removing the mean and scaling
+from sklearn.linear_model import LogisticRegression
+from sklearn import tree 
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+import io 
+import keras
+from keras.models import Sequential
+from keras.layers import Activation, MaxPooling2D, Dropout, Flatten, Reshape, Dense, Conv2D, GlobalAveragePooling2D
+from keras.wrappers.scikit_learn import KerasClassifier
+import keras.optimizers as optimizers
+from keras.applications.vgg16 import VGG16
+from keras.models import Sequential
+from keras.layers.core import Flatten, Dense, Dropout
+from keras.layers.convolutional import Convolution2D, MaxPooling2D, ZeroPadding2D
+from keras.optimizers import SGD
+import sklearn.metrics as metrics
+from tensorflow.keras.losses import categorical_crossentropy
+from keras.callbacks import ModelCheckpoint 
+import seaborn as sns 
+dlibshape_url = 'https://drive.google.com/uc?id=17D3D89Gke6i5nKOvmsbPslrGg5rVgOwg'
+dlibshape_path ='./shape_predictor_68_face_landmarks.dat'
+gdown.download(dlibshape_url, dlibshape_path, True)
+#Getting the Xpure loaded
+pureX_url = 'https://drive.google.com/uc?id=1tc203qSeCwyayyFV7HHrNaMAdT__WoP5'
+pureX_path = './pureX.npy'
+gdown.download(pureX_url, pureX_path,True)
+#Getting the Xdata loaded
+dataX_url = 'https://drive.google.com/uc?id=1pQuzapUKRSXDNZqXuUUdJfO1L-AFuefY'
+dataX_path = './dataX.npy'
+gdown.download(dataX_url, dataX_path, True)
+#Getting the Ydata loaded
+dataY_url = 'https://drive.google.com/uc?id=1figaVbzcmrz8JumBs-1Ql20mbVIh_d0x'
+dataY_path = './dataY.npy'
+gdown.download(dataY_url, dataY_path, True)
+dataset_url = 'https://drive.google.com/uc?id=1hNLedQCRl8uutOwtXWxBmiW3x7bckj4u'
+dataset_path = './ferdata.csv'
+gdown.download(dataset_url, dataset_path, True)
+
+print ("Done")
+
+# Initialising common terms for 3 models
+epochs = 20
+batch_size = 64
+test_ratio = .1
+n_labels = 5
+
+# SNN - STANDARD NEURAL NETWORK
+
+import sklearn.metrics as metrics
+from tensorflow.keras.losses import categorical_crossentropy
+from keras.callbacks import ModelCheckpoint 
+import seaborn as sns 
+
+label_map = {0:"ANGRY",1:"HAPPY",2:"SAD",3:"SURPRISE",4:"NEUTRAL"}
+dataX_pixels = np.load('pureX.npy')
+dataY_pixels = np.load('dataY.npy')
+y_onehot = keras.utils.to_categorical(dataY_pixels, len(set(dataY_pixels)))
+X_train, X_test, y_train, y_test = train_test_split(dataX_pixels, y_onehot, test_size=test_ratio, random_state=42)
+pixel_scaler = StandardScaler()
+pixel_scaler.fit(X_train)
+X_train = pixel_scaler.transform(X_train)
+X_test = pixel_scaler.transform(X_test)
+print(X_train.shape)
+
+mlp_model = Sequential()
+mlp_model.add(Dense(5120, activation='relu',kernel_initializer='glorot_normal', input_shape=( X_train.shape[1]   ,)))
+mlp_model.add(Dropout(0.5))
+mlp_model.add(Dense(512,kernel_initializer='glorot_normal', activation='relu'))
+mlp_model.add(Dropout(0.5))
+mlp_model.add(Dense(256,kernel_initializer='glorot_normal', activation='relu'))
+mlp_model.add(Dropout(0.5))
+mlp_model.add(Dense(n_labels, activation='softmax'))
+
+mlp_model.summary()
+mlp_model.compile(loss=categorical_crossentropy, optimizer=SGD(lr=0.001), metrics=['accuracy'])
+checkpoint = ModelCheckpoint('best_mlp_model.h5', verbose=1, monitor='val_accuracy', save_best_only=True,  mode='auto')  
+mlp_history = mlp_model.fit(X_train, y_train, batch_size=batch_size, epochs=epochs, verbose=1, 
+                            callbacks=[checkpoint], validation_data=(X_test, y_test), shuffle=True)
+
+mlp_performance = mlp_model.evaluate(X_test, y_test, batch_size=64)
+y_pred_mlp = mlp_model.predict_classes(X_test)
+
+
+plt.plot(mlp_history.history['accuracy'])
+plt.plot(mlp_history.history['val_accuracy'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
+
+def plot_confusion_matrix(y_true,y_predicted):
+  cm = metrics.confusion_matrix(y_true, y_predicted)
+  print ("Plotting the Confusion Matrix")
+  labels = list(label_map.values())
+  df_cm = pd.DataFrame(cm,index = labels,columns = labels)
+  fig = plt.figure()
+  res = sns.heatmap(df_cm, annot=True,cmap='Blues', fmt='g')
+  plt.yticks([0.5,1.5,2.5,3.5,4.5], labels,va='center')
+  plt.title('Confusion Matrix - TestData')
+  plt.ylabel('True label')
+  plt.xlabel('Predicted label')
+  #plt.savefig(fig_name)
+  plt.show()
+  plt.close()
+y_true = np.argmax(y_test,axis=1)
+print("Here is a matrix depicting how our model did on its test: ")
+print()
+plot_confusion_matrix(y_true, y_pred_mlp)
+
+# CNN - CONVOLUTIONAL NEURAL NETWORKS
+
+from keras.optimizers import Adam
+from tensorflow.keras.layers import BatchNormalization
+from keras.utils import to_categorical
+width, height = 48, 48 
+print(X_train.shape)
+X_train_cnn = X_train.reshape(len(X_train),height,width)
+X_test_cnn = X_test.reshape(len(X_test),height,width)
+
+X_train_cnn = np.expand_dims(X_train_cnn, 3)
+X_test_cnn = np.expand_dims(X_test_cnn, 3)
+print(X_train_cnn.shape)
+
+model = Sequential()
+model.add(Conv2D(64, kernel_size=(3, 3), activation='relu', input_shape=(width, height, 1)))
+model.add(BatchNormalization())
+model.add(MaxPooling2D(pool_size=(2, 2), strides=(2, 2)))
+model.add(Dropout(0.5))
+
+model.add(Flatten())
+model.add(Dense(512, activation='relu'))
+model.add(Dense(n_labels, activation='softmax'))
+checkpoint = ModelCheckpoint('best_cnn_model.h5', verbose=1, monitor='val_loss',save_best_only=True, mode='auto')  
+
+model.compile(loss=categorical_crossentropy, optimizer=Adam(lr=0.001, beta_1=0.9, beta_2=0.999), metrics=['accuracy'])
+
+
+cnn_history = model.fit(X_train_cnn, y_train, batch_size=batch_size, epochs=epochs, verbose=1, 
+                            callbacks=[checkpoint], validation_data=(X_test_cnn, y_test), shuffle=True)
+cnn_performance = model.evaluate(X_test_cnn, y_test, batch_size=64)
+plt.plot(cnn_history.history['accuracy'])
+plt.plot(cnn_history.history['val_accuracy'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
+
+# VGG 16 
+
+import keras
+from keras.models import Sequential
+from keras.layers import Activation, MaxPooling2D, Dropout, Flatten, Reshape, Dense, Conv2D, GlobalAveragePooling2D
+from keras.wrappers.scikit_learn import KerasClassifier
+import keras.optimizers as optimizers
+from keras.applications.vgg16 import VGG16
+
+vgg = VGG16(weights = 'imagenet', include_top =False, input_shape = (48, 48, 3))
+vgg_model = Sequential()
+# Adding VGG expert 12 layers to our model 
+vgg_model.add(vgg)
+
+vgg_model.add(GlobalAveragePooling2D())
+vgg_model.add(Dense(1024, activation = 'relu'))
+vgg_model.add(Dropout(0.3))
+vgg_model.add(Dense(512, activation = 'relu'))
+vgg_model.add(Dropout(0.3))
+vgg_model.add(Dense(5, activation = 'sigmoid'))
+
+vgg_model.compile(loss = 'categorical_crossentropy', 
+                  optimizer = optimizers.SGD(lr=1e-4, momentum=0.95), 
+                  metrics = ['accuracy'])
+
+X_TRAIN = np.array([np.transpose(np.array([X_train_cnn[ix].squeeze() for i in range(3)]), (1,2,0)) for ix in range(len(X_train))])
+X_TEST = np.array([np.transpose(np.array([X_test_cnn[ix].squeeze() for i in range(3)]), (1,2,0)) for ix in range(len(X_test))])
+
+vgg_history = vgg_model.fit(X_TRAIN, y_train,
+          batch_size=batch_size,
+          epochs=epochs,
+          verbose=1,
+          callbacks=[checkpoint],
+          validation_data=(X_TEST, y_test),
+          shuffle=True)
+plt.plot(vgg_history.history['accuracy'])
+plt.plot(vgg_history.history['val_accuracy'])
+plt.title('model accuracy')
+plt.ylabel('accuracy')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
+
+
