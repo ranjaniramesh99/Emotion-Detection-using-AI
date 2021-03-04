@@ -1,0 +1,57 @@
+!pip install flask-ngrok
+from flask_ngrok import run_with_ngrok
+from flask import Flask, send_file, request, Response, jsonify
+from flask import send_file
+
+!pip install -U flask-cors
+from flask_cors import CORS, cross_origin
+import requests
+
+import numpy as np
+import tensorflow as tf
+import cv2
+from google.colab.patches import cv2_imshow
+
+import codecs
+import base64
+
+!pip install -U jsonpickle
+import jsonpickle
+
+import gdown
+import zipfile
+
+from google.colab import drive
+drive.mount('/content/gdrive')
+
+import os
+os.makedirs("static/js")
+
+url = 'https://drive.google.com/uc?id=1UP9Wcv4KycoDbDI-l61-QtTvRUDJeyUs'
+output = 'static/js/emotion_detection_script.js'
+gdown.download(url, output, quiet=False)
+
+from google.colab.patches import cv2_imshow
+
+cnn_path = F"/content/gdrive/My Drive/transfer_cnn.zip" 
+
+with zipfile.ZipFile(cnn_path, 'r') as zip_ref:
+    zip_ref.extractall('')
+
+cnn = tf.keras.models.load_model('transfer_cnn')
+
+img = cv2.imread('Sad.png',1)
+img = cv2.resize(img,(48,48)).astype('float32')
+
+cv2_imshow(img)
+cv2.waitKey(2000)
+cv2.destroyAllWindows()
+print("Processed Image")
+
+img = np.reshape(img,(1,48,48,3))
+pred = cnn.predict(img)[0]
+print("Predicted Emotion")
+
+emotions = ["Angry","Happy","Sad","Surprise","Neutral"]
+pred_emotion = emotions[np.argmax(pred)]
+print("Predicted Emotion:", pred_emotion)
