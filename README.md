@@ -1,5 +1,5 @@
 # Emotion-Detection-using-AI
-This is an emotion detection project which serves to classify images depicting human emotions into 5 basic emotions - happiness, sadness, anger, neutral and surprise. 
+This is an emotion detection project which serves to classify images depicting human emotions into 5 basic emotions - happiness, sadness, anger, neutral and surprise. I used Google Colaboratory for this project as it makes imposting packages and sectioning the code into smaller pieces, easy. 
 
 Detailed Description:
 This project explores 6 different ML models for this image classification problem:
@@ -9,7 +9,9 @@ This project explores 6 different ML models for this image classification proble
 4. SNN - Standard Neural Network 
 5. CNN - Convolutional Neural Networks
 6. VGG 16 - Transfer Learning Model
-The highest accuracy was achieved by the VGG Model which presented an accuracy of 68.05%
+
+The first three models (upto desicion tree) ran on a CPU instance while the higher ML models ran on a GPU instance. 
+The highest accuracy was achieved by the VGG Model, which presented an accuracy of 68.05%
 
 A CSV file which contained images as strings was used for the training and testing process. The higher ML models (SNN onwards) ran 20 epochs of training each to achieve best training of the model. 
 
